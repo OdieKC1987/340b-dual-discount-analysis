@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>340B Dual Discount Risk Analysis — Project A</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; padding: 24px; }
+  .header { text-align: center; margin-bottom: 32px; }
+  .header h1 { font-size: 28px; color: #fff; margin-bottom: 8px; }
+  .header p { color: #888; font-size: 14px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .kpi { background: #1a1d27; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #2a2d37; }
+  .kpi .value { font-size: 32px; font-weight: 700; color: #60a5fa; }
+  .kpi .label { font-size: 13px; color: #888; margin-top: 4px; }
+  .kpi.alert .value { color: #f59e0b; }
+  .kpi.risk .value { color: #ef4444; }
+  .section { background: #1a1d27; border-radius: 12px; padding: 24px; margin-bottom: 24px; border: 1px solid #2a2d37; }
+  .section h2 { font-size: 18px; margin-bottom: 16px; color: #fff; }
+  .section p.desc { font-size: 13px; color: #888; margin-bottom: 16px; line-height: 1.5; }
+  .chart-container { position: relative; width: 100%; }
+  .chart-tall { height: 500px; }
+  .chart-med { height: 400px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; background: #22252f; color: #aaa; font-weight: 600; border-bottom: 2px solid #333; }
+  td { padding: 10px 12px; border-bottom: 1px solid #2a2d37; }
+  tr:hover { background: #22252f; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .tag-high { background: #7f1d1d; color: #fca5a5; }
+  .tag-med { background: #78350f; color: #fcd34d; }
+  .tag-low { background: #14532d; color: #86efac; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+  .insight { background: #1e293b; border-left: 4px solid #60a5fa; padding: 16px; border-radius: 0 8px 8px 0; margin-top: 16px; font-size: 13px; line-height: 1.6; }
+  .insight strong { color: #93c5fd; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>340B Dual Discount Risk Analysis</h1>
+  <p>Carve-In Contract Pharmacy Analysis &middot; SDUD 2023 &middot; HRSA OPAIS March 2026</p>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="value">62,548</div><div class="label">Active 340B Entities</div></div>
+  <div class="kpi"><div class="value">375,374</div><div class="label">Contract Pharmacy Arrangements</div></div>
+  <div class="kpi alert"><div class="value">3,234</div><div class="label">Carve-In Arrangements (0.86%)</div></div>
+  <div class="kpi"><div class="value">11</div><div class="label">States with Carve-In Activity</div></div>
+  <div class="kpi risk"><div class="value">$45.1B</div><div class="label">Medicaid Spend in Carve-In States</div></div>
+  <div class="kpi"><div class="value">$99.7B</div><div class="label">Total Medicaid Drug Spend 2023</div></div>
+</div>
+
+<div class="section">
+  <h2>Carve-In States: Dual Discount Risk Profile</h2>
+  <p class="desc">These 11 states have contract pharmacies with Medicaid Billing = "Yes" (carve-in), meaning 340B-discounted drugs are being dispensed to Medicaid patients through contract pharmacies — the exact scenario where dual discounts can occur.</p>
+  <table>
+    <thead>
+      <tr><th>State</th><th>Medicaid Drug Spend</th><th>340B Entities</th><th>DSH Hospitals</th><th>Carve-In Arrangements</th><th>Carve-In Entities</th><th>Risk Level</th></tr>
+    </thead>
+    <tbody id="carve-table"></tbody>
+  </table>
+  <div class="insight">
+    <strong>Key finding:</strong> Minnesota has 1,695 carve-in arrangements (52% of all carve-ins nationally) concentrated among 145 entities and just 23 pharmacies, suggesting a small number of pharmacy chains handle the bulk of carve-in volume. New York follows with 952 arrangements across 316 entities. These two states represent 82% of all carve-in activity nationwide.
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="section">
+    <h2>Carve-In Arrangements by State</h2>
+    <div class="chart-container chart-med"><canvas id="carveChart"></canvas></div>
+  </div>
+  <div class="section">
+    <h2>Medicaid Spend vs. 340B Entity Density</h2>
+    <div class="chart-container chart-med"><canvas id="scatterChart"></canvas></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Top 20 Drugs by Medicaid Spend in Carve-In States</h2>
+  <p class="desc">These are the highest-cost drugs flowing through Medicaid in the 11 states with active carve-in contract pharmacies — representing the drugs most exposed to potential dual discount issues.</p>
+  <div class="chart-container chart-tall"><canvas id="drugChart"></canvas></div>
+</div>
+
+<div class="section">
+  <h2>The Oversight Gap: High-Spend States Without Carve-In Tracking</h2>
+  <p class="desc">States with large Medicaid drug programs but zero carve-in contract pharmacy arrangements may be using carve-out approaches (excluding 340B from Medicaid), or may lack visibility into whether dual discounts are occurring.</p>
+  <table>
+    <thead><tr><th>State</th><th>Medicaid Drug Spend</th><th>340B Entities</th><th>DSH Hospitals</th><th>Carve-In Status</th></tr></thead>
+    <tbody id="gap-table"></tbody>
+  </table>
+  <div class="insight">
+    <strong>Oversight concern:</strong> Virginia ($6.1B), Ohio ($4.8B), and Pennsylvania ($4.6B) each have thousands of 340B entities and billions in Medicaid drug spending, yet show zero carve-in contract pharmacy arrangements. While these states may use carve-out at the entity level, the GAO has noted that carve-out enforcement is inconsistent, and the absence of carve-in tracking does not guarantee dual discounts are being prevented.
+  </div>
+</div>
+
+<div class="section">
+  <h2>Analysis Methodology & Data Sources</h2>
+  <p class="desc" style="margin-bottom:0;">
+    This analysis joins three public datasets: (1) <strong>HRSA 340B OPAIS</strong> Covered Entity Export (March 2026) — entity registrations and contract pharmacy arrangements with Medicaid billing flags; (2) <strong>CMS State Drug Utilization Data</strong> (2023, updated Dec 2025) — quarterly Medicaid prescription drug claims by state and NDC; (3) <strong>CMS Medicaid Spending by Drug</strong> (2023) — national drug-level spending trends. The key linkage is the "Medicaid Billing" field in contract pharmacy data, which identifies carve-in arrangements where 340B drugs are billed to Medicaid — the condition under which duplicate discounts can occur. State-level exposure is estimated by overlaying carve-in activity density onto Medicaid drug spending volume.
+  </p>
+</div>
+
+<script>
+const carveData = [{"State": "MN", "medicaid_spend": 1388321134.28, "total_rxs": 11048946.0, "unique_ndcs": 27824.0, "total_entities": 1257, "dsh_count": 712, "ch_count": 69, "carve_in_arrangements": 1695.0, "carve_in_entities": 145.0, "carve_in_pharmacies": 23.0, "total_cp_arrangements": 4586.0, "carve_in_rate": 36.96031399912778, "estimated_exposure_M": 513.1278505461404, "medicaid_spend_M": 1388.3}, {"State": "NY", "medicaid_spend": 9335559639.62, "total_rxs": 76876368.0, "unique_ndcs": 36218.0, "total_entities": 3453, "dsh_count": 2265, "ch_count": 682, "carve_in_arrangements": 952.0, "carve_in_entities": 316.0, "carve_in_pharmacies": 57.0, "total_cp_arrangements": 17393.0, "carve_in_rate": 5.473466337032139, "estimated_exposure_M": 510.9787142481597, "medicaid_spend_M": 9335.6}, {"State": "FL", "medicaid_spend": 3853143216.5, "total_rxs": 28176155.0, "unique_ndcs": 27320.0, "total_entities": 2989, "dsh_count": 1259, "ch_count": 520, "carve_in_arrangements": 393.0, "carve_in_entities": 57.0, "carve_in_pharmacies": 7.0, "total_cp_arrangements": 38064.0, "carve_in_rate": 1.0324716267339218, "estimated_exposure_M": 39.78261044778531, "medicaid_spend_M": 3853.1}, {"State": "MA", "medicaid_spend": 2286764379.3, "total_rxs": 16092849.0, "unique_ndcs": 28557.0, "total_entities": 1334, "dsh_count": 778, "ch_count": 210, "carve_in_arrangements": 98.0, "carve_in_entities": 41.0, "carve_in_pharmacies": 6.0, "total_cp_arrangements": 8033.0, "carve_in_rate": 1.219967633511764, "estimated_exposure_M": 27.89778528213619, "medicaid_spend_M": 2286.8}, {"State": "IL", "medicaid_spend": 3377056327.32, "total_rxs": 26428580.0, "unique_ndcs": 25889.0, "total_entities": 2104, "dsh_count": 790, "ch_count": 438, "carve_in_arrangements": 36.0, "carve_in_entities": 31.0, "carve_in_pharmacies": 7.0, "total_cp_arrangements": 15226.0, "carve_in_rate": 0.2364376724024694, "estimated_exposure_M": 7.984633376035727, "medicaid_spend_M": 3377.1}, {"State": "TX", "medicaid_spend": 4047522303.03, "total_rxs": 34236677.0, "unique_ndcs": 24370.0, "total_entities": 3395, "dsh_count": 1754, "ch_count": 608, "carve_in_arrangements": 15.0, "carve_in_entities": 14.0, "carve_in_pharmacies": 3.0, "total_cp_arrangements": 25069.0, "carve_in_rate": 0.0598348557979975, "estimated_exposure_M": 2.421829133409789, "medicaid_spend_M": 4047.5}, {"State": "CA", "medicaid_spend": 14163462913.91, "total_rxs": 91842777.0, "unique_ndcs": 35538.0, "total_entities": 4902, "dsh_count": 1919, "ch_count": 1915, "carve_in_arrangements": 15.0, "carve_in_entities": 9.0, "carve_in_pharmacies": 7.0, "total_cp_arrangements": 35548.0, "carve_in_rate": 0.0421964667491842, "estimated_exposure_M": 5.976480919001069, "medicaid_spend_M": 14163.5}, {"State": "ND", "medicaid_spend": 108894688.74, "total_rxs": 1009552.0, "unique_ndcs": 15557.0, "total_entities": 736, "dsh_count": 419, "ch_count": 25, "carve_in_arrangements": 12.0, "carve_in_entities": 6.0, "carve_in_pharmacies": 2.0, "total_cp_arrangements": 531.0, "carve_in_rate": 2.2598870056497176, "estimated_exposure_M": 2.460896920677966, "medicaid_spend_M": 108.9}, {"State": "NC", "medicaid_spend": 2679545377.08, "total_rxs": 17132188.0, "unique_ndcs": 29851.0, "total_entities": 1883, "dsh_count": 731, "ch_count": 518, "carve_in_arrangements": 8.0, "carve_in_entities": 5.0, "carve_in_pharmacies": 2.0, "total_cp_arrangements": 9562.0, "carve_in_rate": 0.0836645053336122, "estimated_exposure_M": 2.2418283849236564, "medicaid_spend_M": 2679.5}, {"State": "AZ", "medicaid_spend": 2011259167.21, "total_rxs": 16197454.0, "unique_ndcs": 23615.0, "total_entities": 889, "dsh_count": 361, "ch_count": 218, "carve_in_arrangements": 6.0, "carve_in_entities": 6.0, "carve_in_pharmacies": 2.0, "total_cp_arrangements": 13217.0, "carve_in_rate": 0.0453960808050238, "estimated_exposure_M": 0.9130328367451008, "medicaid_spend_M": 2011.3}, {"State": "KY", "medicaid_spend": 1892796048.3, "total_rxs": 17966692.0, "unique_ndcs": 31932.0, "total_entities": 1881, "dsh_count": 701, "ch_count": 552, "carve_in_arrangements": 4.0, "carve_in_entities": 4.0, "carve_in_pharmacies": 1.0, "total_cp_arrangements": 4946.0, "carve_in_rate": 0.0808734330772341, "estimated_exposure_M": 1.5307691454104326, "medicaid_spend_M": 1892.8}];
+const stateData = [{"State": "CA", "medicaid_spend": 14163462913.91, "total_entities": 4902, "dsh_count": 1919, "carve_in_arrangements": 15.0, "carve_in_entities": 9.0, "carve_in_rate": 0.0421964667491842, "medicaid_spend_M": 14163.5}, {"State": "NY", "medicaid_spend": 9335559639.62, "total_entities": 3453, "dsh_count": 2265, "carve_in_arrangements": 952.0, "carve_in_entities": 316.0, "carve_in_rate": 5.473466337032139, "medicaid_spend_M": 9335.6}, {"State": "VA", "medicaid_spend": 6121108072.8, "total_entities": 1293, "dsh_count": 522, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 6121.1}, {"State": "OH", "medicaid_spend": 4800009951.12, "total_entities": 3188, "dsh_count": 1242, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 4800.0}, {"State": "PA", "medicaid_spend": 4646409262.46, "total_entities": 2570, "dsh_count": 1377, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 4646.4}, {"State": "TX", "medicaid_spend": 4047522303.03, "total_entities": 3395, "dsh_count": 1754, "carve_in_arrangements": 15.0, "carve_in_entities": 14.0, "carve_in_rate": 0.0598348557979975, "medicaid_spend_M": 4047.5}, {"State": "MI", "medicaid_spend": 3914129269.48, "total_entities": 2617, "dsh_count": 1563, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 3914.1}, {"State": "FL", "medicaid_spend": 3853143216.5, "total_entities": 2989, "dsh_count": 1259, "carve_in_arrangements": 393.0, "carve_in_entities": 57.0, "carve_in_rate": 1.0324716267339218, "medicaid_spend_M": 3853.1}, {"State": "IL", "medicaid_spend": 3377056327.32, "total_entities": 2104, "dsh_count": 790, "carve_in_arrangements": 36.0, "carve_in_entities": 31.0, "carve_in_rate": 0.2364376724024694, "medicaid_spend_M": 3377.1}, {"State": "IN", "medicaid_spend": 2791896055.58, "total_entities": 1216, "dsh_count": 478, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 2791.9}, {"State": "LA", "medicaid_spend": 2743341588.09, "total_entities": 2275, "dsh_count": 1496, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 2743.3}, {"State": "NC", "medicaid_spend": 2679545377.08, "total_entities": 1883, "dsh_count": 731, "carve_in_arrangements": 8.0, "carve_in_entities": 5.0, "carve_in_rate": 0.0836645053336122, "medicaid_spend_M": 2679.5}, {"State": "MA", "medicaid_spend": 2286764379.3, "total_entities": 1334, "dsh_count": 778, "carve_in_arrangements": 98.0, "carve_in_entities": 41.0, "carve_in_rate": 1.219967633511764, "medicaid_spend_M": 2286.8}, {"State": "WI", "medicaid_spend": 2042420747.56, "total_entities": 1341, "dsh_count": 599, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 2042.4}, {"State": "AZ", "medicaid_spend": 2011259167.21, "total_entities": 889, "dsh_count": 361, "carve_in_arrangements": 6.0, "carve_in_entities": 6.0, "carve_in_rate": 0.0453960808050238, "medicaid_spend_M": 2011.3}, {"State": "NJ", "medicaid_spend": 2010467811.46, "total_entities": 637, "dsh_count": 326, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 2010.5}, {"State": "KY", "medicaid_spend": 1892796048.3, "total_entities": 1881, "dsh_count": 701, "carve_in_arrangements": 4.0, "carve_in_entities": 4.0, "carve_in_rate": 0.0808734330772341, "medicaid_spend_M": 1892.8}, {"State": "CT", "medicaid_spend": 1877604862.89, "total_entities": 1147, "dsh_count": 710, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 1877.6}, {"State": "MO", "medicaid_spend": 1861427093.18, "total_entities": 1936, "dsh_count": 882, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 1861.4}, {"State": "MD", "medicaid_spend": 1696152445.85, "total_entities": 461, "dsh_count": 135, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 1696.2}, {"State": "WA", "medicaid_spend": 1673771572.45, "total_entities": 1326, "dsh_count": 556, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 1673.8}, {"State": "TN", "medicaid_spend": 1632406303.77, "total_entities": 1141, "dsh_count": 580, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 1632.4}, {"State": "CO", "medicaid_spend": 1546412642.65, "total_entities": 929, "dsh_count": 330, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 1546.4}, {"State": "GA", "medicaid_spend": 1474321789.54, "total_entities": 1399, "dsh_count": 439, "carve_in_arrangements": 0.0, "carve_in_entities": 0.0, "carve_in_rate": 0.0, "medicaid_spend_M": 1474.3}, {"State": "MN", "medicaid_spend": 1388321134.28, "total_entities": 1257, "dsh_count": 712, "carve_in_arrangements": 1695.0, "carve_in_entities": 145.0, "carve_in_rate": 36.96031399912778, "medicaid_spend_M": 1388.3}];
+const drugData = [{"Product Name": "BIKTARVY  ", "medicaid_spend": 1464075880.78, "total_rxs": 365062.0, "states": 8, "medicaid_spend_M": 1464.1}, {"Product Name": "HUMIRA(CF)", "medicaid_spend": 1302470305.86, "total_rxs": 145247.0, "states": 9, "medicaid_spend_M": 1302.5}, {"Product Name": "TRULICITY ", "medicaid_spend": 1123459366.89, "total_rxs": 1070580.0, "states": 11, "medicaid_spend_M": 1123.5}, {"Product Name": "JARDIANCE ", "medicaid_spend": 903589868.84, "total_rxs": 1062515.0, "states": 11, "medicaid_spend_M": 903.6}, {"Product Name": "INVEGA SUS", "medicaid_spend": 735642217.8, "total_rxs": 277819.0, "states": 11, "medicaid_spend_M": 735.6}, {"Product Name": "HUMIRA PEN", "medicaid_spend": 633891544.14, "total_rxs": 74680.0, "states": 11, "medicaid_spend_M": 633.9}, {"Product Name": "OZEMPIC   ", "medicaid_spend": 577333719.18, "total_rxs": 566163.0, "states": 6, "medicaid_spend_M": 577.3}, {"Product Name": "SYMBICORT ", "medicaid_spend": 431496651.82, "total_rxs": 1083746.0, "states": 11, "medicaid_spend_M": 431.5}, {"Product Name": "ELIQUIS   ", "medicaid_spend": 416358853.48, "total_rxs": 677139.0, "states": 8, "medicaid_spend_M": 416.4}, {"Product Name": "STELARA   ", "medicaid_spend": 370361073.85, "total_rxs": 16436.0, "states": 6, "medicaid_spend_M": 370.4}, {"Product Name": "TRIKAFTA  ", "medicaid_spend": 365487304.92, "total_rxs": 15264.0, "states": 7, "medicaid_spend_M": 365.5}, {"Product Name": "ABILIFY MA", "medicaid_spend": 357188339.0, "total_rxs": 146202.0, "states": 11, "medicaid_spend_M": 357.2}, {"Product Name": "COSENTYX S", "medicaid_spend": 335898602.94, "total_rxs": 40962.0, "states": 11, "medicaid_spend_M": 335.9}, {"Product Name": "DUPIXENT S", "medicaid_spend": 329496751.42, "total_rxs": 91444.0, "states": 8, "medicaid_spend_M": 329.5}, {"Product Name": "OZEMPIC 0.", "medicaid_spend": 293657512.66, "total_rxs": 301156.0, "states": 5, "medicaid_spend_M": 293.7}, {"Product Name": "STELARA 90", "medicaid_spend": 283181696.67, "total_rxs": 11260.0, "states": 5, "medicaid_spend_M": 283.2}, {"Product Name": "VYVANSE   ", "medicaid_spend": 277200080.05, "total_rxs": 807571.0, "states": 6, "medicaid_spend_M": 277.2}, {"Product Name": "FLOVENT HF", "medicaid_spend": 272161768.91, "total_rxs": 1049889.0, "states": 11, "medicaid_spend_M": 272.2}, {"Product Name": "DUPIXENT P", "medicaid_spend": 268831990.72, "total_rxs": 75219.0, "states": 8, "medicaid_spend_M": 268.8}, {"Product Name": "GENVOYA   ", "medicaid_spend": 239205005.64, "total_rxs": 58861.0, "states": 8, "medicaid_spend_M": 239.2}];
+
+// Populate carve-in table
+const ct = document.getElementById('carve-table');
+carveData.sort((a,b) => b.carve_in_arrangements - a.carve_in_arrangements).forEach(r => {
+  const risk = r.carve_in_arrangements > 500 ? '<span class="tag tag-high">HIGH</span>' :
+               r.carve_in_arrangements > 50 ? '<span class="tag tag-med">MEDIUM</span>' :
+               '<span class="tag tag-low">LOW</span>';
+  ct.innerHTML += `<tr>
+    <td><strong>${r.State}</strong></td>
+    <td>${r.medicaid_spend_M > 1000 ? '$' + (r.medicaid_spend_M/1000).toFixed(1) + 'B' : '$' + r.medicaid_spend_M.toFixed(0) + 'M'}</td>
+    <td>${Math.round(r.total_entities).toLocaleString()}</td>
+    <td>${Math.round(r.dsh_count).toLocaleString()}</td>
+    <td>${Math.round(r.carve_in_arrangements).toLocaleString()}</td>
+    <td>${Math.round(r.carve_in_entities).toLocaleString()}</td>
+    <td>${risk}</td>
+  </tr>`;
+});
+
+// Gap table
+const gt = document.getElementById('gap-table');
+stateData.filter(r => r.carve_in_arrangements === 0 && r.medicaid_spend_M > 1000)
+  .sort((a,b) => b.medicaid_spend_M - a.medicaid_spend_M).slice(0,10).forEach(r => {
+  gt.innerHTML += `<tr>
+    <td><strong>${r.State}</strong></td>
+    <td>${r.medicaid_spend_M > 1000 ? '$' + (r.medicaid_spend_M/1000).toFixed(1) + 'B' : '$' + r.medicaid_spend_M + 'M'}</td>
+    <td>${Math.round(r.total_entities).toLocaleString()}</td>
+    <td>${Math.round(r.dsh_count).toLocaleString()}</td>
+    <td><span class="tag tag-med">No Carve-In Data</span></td>
+  </tr>`;
+});
+
+// Carve-in bar chart
+new Chart(document.getElementById('carveChart'), {
+  type: 'bar',
+  data: {
+    labels: carveData.map(r => r.State),
+    datasets: [{
+      label: 'Carve-In Arrangements',
+      data: carveData.map(r => r.carve_in_arrangements),
+      backgroundColor: '#ef4444',
+      borderRadius: 4
+    }, {
+      label: 'Carve-In Entities',
+      data: carveData.map(r => r.carve_in_entities),
+      backgroundColor: '#60a5fa',
+      borderRadius: 4
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#aaa' } } },
+    scales: {
+      x: { ticks: { color: '#aaa' }, grid: { color: '#222' } },
+      y: { ticks: { color: '#aaa' }, grid: { color: '#222' } }
+    }
+  }
+});
+
+// Scatter: Medicaid spend vs entity count
+const scatterPts = stateData.filter(r => r.medicaid_spend_M > 100).map(r => ({
+  x: r.total_entities, y: r.medicaid_spend_M,
+  label: r.State, carve: r.carve_in_arrangements > 0
+}));
+new Chart(document.getElementById('scatterChart'), {
+  type: 'scatter',
+  data: {
+    datasets: [{
+      label: 'Has Carve-In',
+      data: scatterPts.filter(p => p.carve),
+      backgroundColor: '#ef4444',
+      pointRadius: 8
+    }, {
+      label: 'No Carve-In',
+      data: scatterPts.filter(p => !p.carve),
+      backgroundColor: '#4b5563',
+      pointRadius: 6
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#aaa' } },
+      tooltip: { callbacks: { label: ctx => ctx.raw.label + ': $' + ctx.raw.y.toLocaleString() + 'M, ' + ctx.raw.x + ' entities' } }
+    },
+    scales: {
+      x: { title: { display: true, text: '340B Entities', color: '#aaa' }, ticks: { color: '#aaa' }, grid: { color: '#222' } },
+      y: { title: { display: true, text: 'Medicaid Drug Spend ($M)', color: '#aaa' }, ticks: { color: '#aaa' }, grid: { color: '#222' } }
+    }
+  }
+});
+
+// Drug bar chart
+new Chart(document.getElementById('drugChart'), {
+  type: 'bar',
+  data: {
+    labels: drugData.map(r => r['Product Name'].trim()),
+    datasets: [{
+      label: 'Medicaid Spend ($M)',
+      data: drugData.map(r => r.medicaid_spend_M),
+      backgroundColor: drugData.map(r => r.medicaid_spend_M > 500 ? '#ef4444' : r.medicaid_spend_M > 200 ? '#f59e0b' : '#60a5fa'),
+      borderRadius: 4
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { title: { display: true, text: 'Medicaid Spend ($M) in Carve-In States', color: '#aaa' }, ticks: { color: '#aaa' }, grid: { color: '#222' } },
+      y: { ticks: { color: '#aaa', font: { size: 11 } }, grid: { color: '#222' } }
+    }
+  }
+});
+</script>
+</body>
+</html>
