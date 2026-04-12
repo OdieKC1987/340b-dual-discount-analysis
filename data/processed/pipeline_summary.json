@@ -1,0 +1,21 @@
+{
+  "total_active_entities": 62548,
+  "total_cp_arrangements": 375374,
+  "carve_in_arrangements": 3234,
+  "carve_in_rate_pct": 0.86,
+  "carve_in_states": [
+    "AZ",
+    "CA",
+    "FL",
+    "IL",
+    "KY",
+    "MA",
+    "MN",
+    "NC",
+    "ND",
+    "NY",
+    "TX"
+  ],
+  "total_medicaid_spend_B": 99.7,
+  "carve_in_states_medicaid_spend_B": 45.1
+}
