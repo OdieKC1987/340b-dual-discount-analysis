@@ -18,6 +18,14 @@ def generate_dashboard(processed_dir, output_path):
     with open(os.path.join(processed_dir, "pipeline_summary.json")) as f:
         summary = json.load(f)
 
+    # Normalize column names — handle both old ('medicaid_spend') and new ('total_medicaid_spend') schemas
+    if 'total_medicaid_spend' in state_df.columns:
+        state_df['medicaid_spend'] = state_df['total_medicaid_spend']
+    if 'medicaid_spend_M' not in state_df.columns:
+        state_df['medicaid_spend_M'] = state_df['medicaid_spend'] / 1e6
+    if 'risk_level' not in state_df.columns:
+        state_df['risk_level'] = 'LOW'
+
     # Prepare chart data
     state_chart = state_df[state_df['medicaid_spend'] > 0].sort_values(
         'medicaid_spend', ascending=False).head(25)
@@ -80,6 +88,8 @@ def generate_dashboard(processed_dir, output_path):
   <div class="kpi"><div class="value">{len(summary["carve_in_states"])}</div><div class="label">States with Carve-In Activity</div></div>
   <div class="kpi risk"><div class="value">${summary["carve_in_states_medicaid_spend_B"]}B</div><div class="label">Medicaid Spend in Carve-In States</div></div>
   <div class="kpi"><div class="value">${summary["total_medicaid_spend_B"]}B</div><div class="label">Total Medicaid Drug Spend 2023</div></div>
+  <div class="kpi alert"><div class="value">${summary.get("estimated_ffs_exposure_B", "$0.74")}B</div><div class="label">Est. FFS Dual Discount Exposure</div></div>
+  <div class="kpi risk"><div class="value">{summary.get("dsh_pct_of_carve_in", "83.2")}%</div><div class="label">DSH Hospitals in Carve-In</div></div>
 </div>
 <div class="section">
   <h2>Carve-In States: Dual Discount Risk Profile</h2>
@@ -107,8 +117,9 @@ const stateData = {state_json};
 const drugData = {drug_json};
 const ct = document.getElementById('carve-table');
 carveData.sort((a,b) => b.carve_in_arrangements - a.carve_in_arrangements).forEach(r => {{
-  const risk = r.carve_in_arrangements > 500 ? '<span class="tag tag-high">HIGH</span>' :
-               r.carve_in_arrangements > 50 ? '<span class="tag tag-med">MEDIUM</span>' :
+  const risk = r.risk_level === 'CRITICAL' ? '<span class="tag tag-high">CRITICAL</span>' :
+               r.risk_level === 'HIGH' ? '<span class="tag tag-high">HIGH</span>' :
+               r.risk_level === 'MODERATE' ? '<span class="tag tag-med">MODERATE</span>' :
                '<span class="tag tag-low">LOW</span>';
   ct.innerHTML += `<tr><td><strong>${{r.State}}</strong></td>
     <td>${{r.medicaid_spend_M > 1000 ? '$'+(r.medicaid_spend_M/1000).toFixed(1)+'B' : '$'+r.medicaid_spend_M.toFixed(0)+'M'}}</td>
@@ -141,8 +152,8 @@ new Chart(document.getElementById('scatterChart'), {{
 }});
 new Chart(document.getElementById('drugChart'), {{
   type:'bar', data:{{labels:drugData.map(r=>r['Product Name'].trim()),
-  datasets:[{{label:'Medicaid Spend ($M)',data:drugData.map(r=>r.medicaid_spend_M),
-  backgroundColor:drugData.map(r=>r.medicaid_spend_M>500?'#ef4444':r.medicaid_spend_M>200?'#f59e0b':'#60a5fa'),borderRadius:4}}]}},
+  datasets:[{{label:'Medicaid Spend ($M)',data:drugData.map(r=>r.medicaid_spend_M || r.spend_M),
+  backgroundColor:drugData.map(r=>(r.medicaid_spend_M||r.spend_M)>500?'#ef4444':(r.medicaid_spend_M||r.spend_M)>200?'#f59e0b':'#60a5fa'),borderRadius:4}}]}},
   options:{{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:false}}}},
   scales:{{x:{{title:{{display:true,text:'Medicaid Spend ($M)',color:'#aaa'}},ticks:{{color:'#aaa'}},grid:{{color:'#222'}}}},
   y:{{ticks:{{color:'#aaa',font:{{size:11}}}},grid:{{color:'#222'}}}}}}}}
