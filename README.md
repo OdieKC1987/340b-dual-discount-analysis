@@ -5,8 +5,6 @@ An AI-powered analysis system that identifies and quantifies dual discount risk 
 Video Presentation
 Watch the project presentation: [ and demo on YouTube](https://docs.google.com/presentation/d/10_8HHBVo9xhBsckgQOsQehKassIAN4Yl/edit?usp=sharing&ouid=101438158060080140692&rtpof=true&sd=true)
 
-Note: Replace the link above with your actual YouTube/Google Drive URL after recording.
-
 Problem Statement
 The 340B Drug Pricing Program requires drug manufacturers to provide outpatient drugs at significantly reduced prices to eligible healthcare organizations ("covered entities"). A dual discount (or "duplicate discount") occurs when a manufacturer is subject to both a 340B discounted price and a Medicaid drug rebate on the same prescription — which is prohibited by federal law but difficult to enforce.
 The GAO has found that CMS does not effectively track or prevent dual discounts, and states use inconsistent methods to identify 340B claims. This project applies AI techniques to analyze the scope of this problem using public data.
